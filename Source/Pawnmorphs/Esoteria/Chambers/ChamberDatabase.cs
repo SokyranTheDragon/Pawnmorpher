@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Configuration;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.DebugUtils;
 using Pawnmorph.Hediffs;
 using Pawnmorph.Utilities;
@@ -393,6 +394,7 @@ namespace Pawnmorph.Chambers
         ///     Removes the given mutation def from database.
         /// </summary>
         /// <param name="mDef">The m definition.</param>
+        [SyncMethod]
         public void RemoveFromDatabase(MutationDef mDef)
         {
             if (!_storedMutations.Contains(mDef))
@@ -406,6 +408,7 @@ namespace Pawnmorph.Chambers
         ///     Removes the given pawnkind def from the database.
         /// </summary>
         /// <param name="pkDef">The pk definition.</param>
+        [SyncMethod]
         public void RemoveFromDatabase(PawnKindDef pkDef)
         {
             if (!_taggedSpecies.Contains(pkDef)) return;

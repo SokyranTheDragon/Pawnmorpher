@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.Chambers;
 using Pawnmorph.Utilities;
 using Verse;
@@ -153,7 +154,7 @@ namespace Pawnmorph.ThingComps
             Scribe_Values.Look(ref _enabled, nameof(Enabled), true); 
         }
 
-
+        [SyncMethod]
         private void ChoseAnimal(PawnKindDef chosenKind)
         {
             _chosenKind = chosenKind;

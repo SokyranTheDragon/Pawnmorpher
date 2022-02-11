@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.Chambers;
 using Pawnmorph.Utilities;
 using UnityEngine;
@@ -259,6 +260,7 @@ namespace Pawnmorph.User_Interface
         /// Closes the specified do close sound.
         /// </summary>
         /// <param name="doCloseSound">if set to <c>true</c> [do close sound].</param>
+        [SyncMethod]
         public override void Close(bool doCloseSound = false)
         {
             if (!confirmed)
@@ -279,6 +281,7 @@ namespace Pawnmorph.User_Interface
         /// <summary>
         /// Called when [accept key pressed].
         /// </summary>
+        [SyncMethod]
         public override void OnAcceptKeyPressed()
         {
             confirmed = true;
@@ -360,12 +363,7 @@ namespace Pawnmorph.User_Interface
                 ThingDef_AlienRace pawnDef = pawn.def as ThingDef_AlienRace;
                 foreach (string crownType in pawnDef.alienRace.generalSettings.alienPartGenerator.aliencrowntypes)
                 {
-                    void changeHeadType()
-                    {
-                        pawn.GetComp<AlienPartGenerator.AlienComp>().crownType = crownType;
-                        recachePreview = true;
-                    }
-                    options.Add(new FloatMenuOption(crownType.Replace('_', ' '), changeHeadType));
+                    options.Add(new FloatMenuOption(crownType.Replace('_', ' '), () => ChangeHeadType(pawn, crownType)));
                 }
                 Find.WindowStack.Add(new FloatMenu(options));
             }
@@ -379,12 +377,7 @@ namespace Pawnmorph.User_Interface
                 List<FloatMenuOption> options = new List<FloatMenuOption>();
                 foreach (BodyTypeDef bodyType in DefDatabase<BodyTypeDef>.AllDefs)
                 {
-                    void changeBodyType()
-                    {
-                        pawn.story.bodyType = bodyType;
-                        recachePreview = true;
-                    }
-                    options.Add(new FloatMenuOption(bodyType.defName, changeBodyType));
+                    options.Add(new FloatMenuOption(bodyType.defName, () => ChangeBodyType(pawn, bodyType)));
                 }
                 Find.WindowStack.Add(new FloatMenu(options));
             }
@@ -393,12 +386,22 @@ namespace Pawnmorph.User_Interface
             // Then the parts list toggles...
             string skinSyncText = SKIN_SYNC_LOC_STRING.Translate();
             Rect skinSyncRect = new Rect(columnWidth + SPACER_SIZE, curY, PREVIEW_SIZE.x, Text.CalcHeight(skinSyncText, PREVIEW_SIZE.x));
-            Widgets.CheckboxLabeled(skinSyncRect, skinSyncText, ref skinSync);
+            bool temp = skinSync;
+            Widgets.CheckboxLabeled(skinSyncRect, skinSyncText, ref temp);
+            if (temp != skinSync)
+            {
+                SetSkinSync(temp);
+            }
             curY += skinSyncRect.height;
 
             string symmetryToggleText = DO_SYMMETRY_LOC_STRING.Translate();
             Rect symmetryToggleRect = new Rect(columnWidth + SPACER_SIZE, curY, PREVIEW_SIZE.x, Text.CalcHeight(symmetryToggleText, PREVIEW_SIZE.x));
-            Widgets.CheckboxLabeled(symmetryToggleRect, symmetryToggleText, ref doSymmetry);
+            temp = doSymmetry;
+            Widgets.CheckboxLabeled(symmetryToggleRect, symmetryToggleText, ref temp);
+            if (temp != doSymmetry)
+            {
+                SetDoSymmetry(temp);
+            }
             curY += symmetryToggleRect.height;
 
             // Then finally the Aspect selection list.
@@ -430,6 +433,7 @@ namespace Pawnmorph.User_Interface
         /// <summary>
         /// Resets this instance.
         /// </summary>
+        [SyncMethod]
         public void Reset()
         {
             pawn.health.hediffSet.hediffs = new List<Hediff>(cachedInitialHediffs.Select(m => m.hediff));
@@ -522,42 +526,13 @@ namespace Pawnmorph.User_Interface
             if (Widgets.ButtonText(partButtonRect, label))
             {
                 List<FloatMenuOption> options = new List<FloatMenuOption>();
-                void removeMutations()
-                {
-                    foreach (Hediff_AddedMutation mutation in mutations)
-                    {
-                        addedMutations.RemoveByPartAndLayer(mutation.Part, layer);
-                        if (cachedInitialHediffs.Select(m => m.hediff).Contains(mutation))
-                        {
-                            addedMutations.AddData(mutation.Def, mutation.Part, mutation.Severity, mutation.ProgressionHalted, true);
-                        }
-                        pawn.health.RemoveHediff(mutation);
-                    }
-                    recachePreview = true;
-                    RecachePawnMutations();
-                }
-                options.Add(new FloatMenuOption(NO_MUTATIONS_LOC_STRING.Translate(), removeMutations));
+                options.Add(new FloatMenuOption(NO_MUTATIONS_LOC_STRING.Translate(), () => RemoveMutations(mutations, layer)));
 
 
                 List<MutationDef> mutationDefs = cachedMutationDefsByPartDef[parts.FirstOrDefault().def];
                 foreach (MutationDef mutationDef in mutationDefs.Where(m => m.RemoveComp.layer == layer && (DebugSettings.godMode || m.IsTagged())))
                 {
-                    void addMutation()
-                    {
-                        foreach (Hediff_AddedMutation mutation in mutations)
-                        {
-                            pawn.health.RemoveHediff(mutation);
-                        }
-                        foreach (BodyPartRecord part in parts)
-                        {
-                            addedMutations.RemoveByPartAndLayer(part, layer);
-                            addedMutations.AddData(mutationDef, part, mutationDef.initialSeverity, false, false);
-                            MutationUtilities.AddMutation(pawn, mutationDef, part, ancillaryEffects:MutationUtilities.AncillaryMutationEffects.None); //don't give the green puffs
-                        }
-                        recachePreview = true;
-                        RecachePawnMutations();
-                    }
-                    options.Add(new FloatMenuOption($"{mutationDef.LabelCap} ({mutationDef.classInfluence.label.CapitalizeFirst()})", addMutation));
+                    options.Add(new FloatMenuOption($"{mutationDef.LabelCap} ({mutationDef.classInfluence.label.CapitalizeFirst()})", () => AddMutation(mutations, layer, parts, mutationDef)));
                 }
                 Find.WindowStack.Add(new FloatMenu(options));
             }
@@ -601,26 +576,7 @@ namespace Pawnmorph.User_Interface
                         MultiCheckboxState newState = Widgets.CheckboxMulti(checkBoxRect, initialState);
                         if (initialState != newState)
                         {
-                            initialState = newState;
-                            mutationsOfDef.FirstOrDefault().SeverityAdjust.Halted = !mutationsOfDef.FirstOrDefault().SeverityAdjust.Halted;
-                            foreach (Hediff_AddedMutation mutationOfDef in mutationsOfDef)
-                            {
-                                MutationData relevantEntry = addedMutations.MutationsByPartAndLayer(mutationOfDef.Part, layer);
-                                if (cachedInitialHediffs.Select(m => m.hediff).Contains(mutationOfDef))
-                                {
-                                    bool initialHediffIsHalted = cachedInitialHediffs.Where(m => m.hediff == mutationOfDef).FirstOrDefault().isHalted;
-                                    if (newState == MultiCheckboxState.On == initialHediffIsHalted)
-                                        addedMutations.RemoveByPartAndLayer(mutationOfDef.Part, layer);
-                                }
-                                if (relevantEntry != null)
-                                {
-                                    relevantEntry.isHalted = newState == MultiCheckboxState.On;
-                                }
-                                else
-                                {
-                                    addedMutations.AddData(mutationOfDef.Def, mutationOfDef.Part, mutationOfDef.Severity, newState == MultiCheckboxState.On, false);
-                                }
-                            }
+                            UpdateState(newState, mutationsOfDef, layer);
                         }
                         curY += Math.Max(pauseLabelRect.height, checkBoxRect.height);
                     }
@@ -659,21 +615,7 @@ namespace Pawnmorph.User_Interface
             float newSeverity = Widgets.HorizontalSlider(new Rect(partListViewRect.x, curY, partListViewRect.width, SLIDER_HEIGHT), curSeverity, mutationDef.minSeverity, mutationDef.maxSeverity);
             if (curSeverity != newSeverity)
             {
-                curSeverity = newSeverity;
-                foreach (Hediff_AddedMutation mutationOfDef in mutationsOfDef)
-                {
-                    MutationData relevantEntry = addedMutations.MutationsByPartAndLayer(mutationOfDef.Part, layer);
-                    if (relevantEntry != null)
-                    {
-                        relevantEntry.severity = newSeverity;
-                    }
-                    else
-                    {
-                        addedMutations.AddData(mutationOfDef.Def, mutationOfDef.Part, newSeverity, mutationOfDef.ProgressionHalted, false);
-                    }
-                    mutationOfDef.Severity = newSeverity;
-                }
-                recachePreview = true;
+                SetSeverity(newSeverity, mutationsOfDef, layer);
             }
             curY += SLIDER_HEIGHT;
         }
@@ -899,6 +841,131 @@ namespace Pawnmorph.User_Interface
                 previewImage = new RenderTexture((int)PREVIEW_SIZE.x, (int)PREVIEW_SIZE.y, 24);
                 camera.targetTexture = previewImage;
             }
+        }
+
+        [SyncMethod]
+        private void ChangeHeadType(Pawn pawn, string crownType)
+        {
+            pawn.GetComp<AlienPartGenerator.AlienComp>().crownType = crownType;
+            recachePreview = true;
+        }
+
+        [SyncMethod]
+        private void ChangeBodyType(Pawn pawn, BodyTypeDef bodyType)
+        {
+            pawn.story.bodyType = bodyType;
+            recachePreview = true;
+        }
+
+        [SyncMethod]
+        private void RemoveMutations(List<Hediff_AddedMutation> mutations, MutationLayer layer)
+        {
+            foreach (Hediff_AddedMutation mutation in mutations)
+            {
+                addedMutations.RemoveByPartAndLayer(mutation.Part, layer);
+                if (cachedInitialHediffs.Select(m => m.hediff).Contains(mutation))
+                {
+                    addedMutations.AddData(mutation.Def, mutation.Part, mutation.Severity, mutation.ProgressionHalted, true);
+                }
+                pawn.health.RemoveHediff(mutation);
+            }
+            recachePreview = true;
+            RecachePawnMutations();
+        }
+
+        [SyncMethod]
+        private void AddMutation(List<Hediff_AddedMutation> mutations, MutationLayer layer, List<BodyPartRecord> parts, MutationDef mutationDef)
+        {
+            foreach (Hediff_AddedMutation mutation in mutations)
+            {
+                pawn.health.RemoveHediff(mutation);
+            }
+            foreach (BodyPartRecord part in parts)
+            {
+                addedMutations.RemoveByPartAndLayer(part, layer);
+                addedMutations.AddData(mutationDef, part, mutationDef.initialSeverity, false, false);
+                MutationUtilities.AddMutation(pawn, mutationDef, part, ancillaryEffects: MutationUtilities.AncillaryMutationEffects.None); //don't give the green puffs
+            }
+            recachePreview = true;
+            RecachePawnMutations();
+        }
+
+        [SyncMethod]
+        private void UpdateState(MultiCheckboxState state, List<Hediff_AddedMutation> mutationsOfDef, MutationLayer layer)
+        {
+            mutationsOfDef.FirstOrDefault().SeverityAdjust.Halted = !mutationsOfDef.FirstOrDefault().SeverityAdjust.Halted;
+            foreach (Hediff_AddedMutation mutationOfDef in mutationsOfDef)
+            {
+                MutationData relevantEntry = addedMutations.MutationsByPartAndLayer(mutationOfDef.Part, layer);
+                if (cachedInitialHediffs.Select(m => m.hediff).Contains(mutationOfDef))
+                {
+                    bool initialHediffIsHalted = cachedInitialHediffs.Where(m => m.hediff == mutationOfDef).FirstOrDefault().isHalted;
+                    if (state == MultiCheckboxState.On == initialHediffIsHalted)
+                        addedMutations.RemoveByPartAndLayer(mutationOfDef.Part, layer);
+                }
+                if (relevantEntry != null)
+                {
+                    relevantEntry.isHalted = state == MultiCheckboxState.On;
+                }
+                else
+                {
+                    addedMutations.AddData(mutationOfDef.Def, mutationOfDef.Part, mutationOfDef.Severity, state == MultiCheckboxState.On, false);
+                }
+            }
+        }
+
+        [SyncMethod]
+        private void SetSeverity(float severity, List<Hediff_AddedMutation> mutationsOfDef, MutationLayer layer)
+        {
+            foreach (Hediff_AddedMutation mutationOfDef in mutationsOfDef)
+            {
+                MutationData relevantEntry = addedMutations.MutationsByPartAndLayer(mutationOfDef.Part, layer);
+                if (relevantEntry != null)
+                {
+                    relevantEntry.severity = severity;
+                }
+                else
+                {
+                    addedMutations.AddData(mutationOfDef.Def, mutationOfDef.Part, severity, mutationOfDef.ProgressionHalted, false);
+                }
+                mutationOfDef.Severity = severity;
+            }
+            recachePreview = true;
+        }
+
+        [SyncMethod]
+        private void SetSkinSync(bool newSkinSync)
+        {
+            skinSync = newSkinSync;
+        }
+
+        [SyncMethod]
+        private void SetDoSymmetry(bool newDoSymmetry)
+        {
+            doSymmetry = newDoSymmetry;
+        }
+
+        /// <summary>
+        /// Syncs this dialog between all players - as it should be open already it only finds it on the side of other players
+        /// </summary>
+        [SyncWorker]
+        private static void SyncDialog([NotNull] SyncWorker sync, ref Dialog_PartPicker dialog)
+        {
+            if (!sync.isWriting)
+            {
+                dialog = Find.WindowStack.WindowOfType<Dialog_PartPicker>();
+            }
+        }
+
+        /// <summary>
+        /// Pauses the game when this dialog is open
+        /// </summary>
+        /// <param name="map">Current map or null if global context</param>
+        /// <returns>True if the game should be paused</returns>
+        [PauseLock]
+        private static bool PauseIfDialogOpen(Map map)
+        {
+            return Find.WindowStack.IsOpen<Dialog_PartPicker>();
         }
     }
 

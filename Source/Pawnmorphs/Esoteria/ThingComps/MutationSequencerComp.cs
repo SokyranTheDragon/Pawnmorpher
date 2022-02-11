@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.Chambers;
 using Pawnmorph.Hediffs;
 using RimWorld;
@@ -185,6 +186,7 @@ namespace Pawnmorph.ThingComps
                 _chosenAnimalToScan = null;
         }
 
+        [SyncMethod]
         private void ChoseAnimal(PawnKindDef tk)
         {
             _chosenAnimalToScan = tk;

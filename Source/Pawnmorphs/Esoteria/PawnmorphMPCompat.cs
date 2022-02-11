@@ -19,8 +19,8 @@ namespace PawnMorpher
         {
             if (!MP.enabled) return;
 
+            MP.RegisterAll();
             PatchRand();
-            SyncMethods();
 
             Log.Message("Pawnmorpher :: Multiplayer Compatibility enabled");
         }
@@ -43,19 +43,6 @@ namespace PawnMorpher
                     prefix: new HarmonyMethod(typeof(PawnmorphMPCompat), nameof(PushState)),
                     postfix: new HarmonyMethod(typeof(PawnmorphMPCompat), nameof(PopState))
                 );
-            }
-        }
-
-        static void SyncMethods()
-        {
-#pragma warning disable 612
-            var syncMethods = new MethodInfo[] {
-                // Gizmos
-#pragma warning restore 612
-            };
-
-            foreach(var method in syncMethods) {
-                MP.RegisterSyncMethod(method);
             }
         }
 

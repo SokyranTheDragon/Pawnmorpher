@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.SlurryNet;
 using Pawnmorph.Utilities;
 using RimWorld;
@@ -508,6 +509,7 @@ namespace Pawnmorph.Buildings
         }
 
 
+        [SyncMethod]
         private void ToggleRunMode()
         {
             CurrentMode = NextMode(CurrentMode);

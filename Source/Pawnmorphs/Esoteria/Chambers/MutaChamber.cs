@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
+using Multiplayer.API;
 using Pawnmorph.Hediffs;
 using Pawnmorph.TfSys;
 using Pawnmorph.ThingComps;
@@ -703,6 +704,7 @@ namespace Pawnmorph.Chambers
             Log.Message(builder.ToString());
         }
 
+        [SyncMethod]
         private void DebugFinishChamber()
         {
             _innerState = ChamberState.Active; 
@@ -805,6 +807,7 @@ namespace Pawnmorph.Chambers
             }
         }
 
+        [SyncMethod]
         private void EnterMergingIdle()
         {
             _innerState = ChamberState.WaitingForPawnMerging;
@@ -905,6 +908,7 @@ namespace Pawnmorph.Chambers
             SelectorComp.AnimalChosen += AnimalChosen;
         }
 
+        [SyncMethod]
         private void OpenPartPicker()
         {
             var pawn = innerContainer.First() as Pawn;

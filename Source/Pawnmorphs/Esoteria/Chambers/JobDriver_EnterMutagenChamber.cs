@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using Multiplayer.API;
 using Pawnmorph.Chambers;
 using Verse;
 using Verse.AI;
@@ -52,7 +53,7 @@ namespace Pawnmorph
                 if (!pod.def.building.isPlayerEjectable)
                 {
                     int freeColonistsSpawnedOrInPlayerEjectablePodsCount = Map.mapPawns.FreeColonistsSpawnedOrInPlayerEjectablePodsCount;
-                    if (freeColonistsSpawnedOrInPlayerEjectablePodsCount <= 1)
+                    if (freeColonistsSpawnedOrInPlayerEjectablePodsCount <= 1 && !MP.IsInMultiplayer) // Should probably sync the dialog for MP, but for now let's just skip it completely 
                     {
                         Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("CasketWarning".Translate(actor.Named("PAWN")).AdjustedFor(actor), action));
                     }
